@@ -179,6 +179,50 @@ const responseSchema = {
   }
 };
 
+
+app.post('/api/analyze', async (req, res) => {
+  try {
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ error: 'GEMINI_API_KEY is missing.' });
+    }
+
+    const { client, targetNiche, targetRegion, username, bio, followers, following, posts, engagementRate, location } = req.body;
+
+    const prompt = `TARA:
+Kampanya: ${client}
+Hedef Niş: ${targetNiche}
+Hedef Bölge: ${targetRegion}
+
+Kullanıcı adı: ${username}
+Biyografi: ${bio}
+Takipçi: ${followers}
+Takip edilen: ${following}
+Gönderi sayısı: ${posts}
+Tahmini etkileşim oranı: ${engagementRate}
+Konum (varsa): ${location}`;
+
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        systemInstruction: systemPrompt,
+        responseMimeType: 'application/json',
+        responseSchema: responseSchema as any,
+        temperature: 0.2,
+      }
+    });
+
+    if (!response.text) {
+      return res.status(502).json({ error: 'No response received from the model.' });
+    }
+
+    return res.json(JSON.parse(response.text));
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'An error occurred during analysis.' });
+  }
+});
+
 app.post('/api/automate', async (req, res) => {
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Transfer-Encoding', 'chunked');
